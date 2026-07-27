@@ -304,6 +304,7 @@
   .room-item {
     padding: 10px 12px;
     border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
     border-radius: 4px;
     margin-bottom: 8px;
     cursor: pointer;
@@ -362,6 +363,32 @@
 
   .hidden { display: none !important; }
 
+  .boot-line {
+    color: var(--text-dim); font-size: 13px; margin-bottom: 6px;
+    animation: fadeInBoot 0.3s ease;
+  }
+  @keyframes fadeInBoot {
+    from { opacity: 0; transform: translateX(-4px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pesanMasuk {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg-baru { animation: pesanMasuk 0.25s ease; }
+
+  .chat-kosong {
+    text-align: center; color: var(--text-dim); font-size: 13px;
+    font-style: italic; margin: auto; padding: 30px 20px;
+  }
+
+  .room-meta { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .boot-line, .msg-baru { animation: none; }
+  }
+
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
@@ -379,17 +406,7 @@
     </div>
 
     <div class="screen" id="setupScreen">
-      <div class="setup-log">
-        <div><span class="tag-warn">[PERINGATAN]</span> firebaseConfig belum diisi.</div>
-        <div style="margin-top:10px;">Ruang obrol ini butuh Firebase (gratis) biar pesannya nyambung real-time. Langkahnya:</div>
-        <ol>
-          <li>Buka <code>console.firebase.google.com</code>, bikin project baru (gratis, gak perlu kartu kredit)</li>
-          <li><code>Build → Firestore Database</code> → <code>Create database</code> → pilih <code>mode test</code></li>
-          <li><code>Build → Authentication</code> → <code>Get started</code> → <code>Sign-in method</code> → aktifkan <code>Anonymous</code></li>
-          <li>Klik ikon gerigi <code>Project settings</code> → scroll bawah → <code>Add app → Web (&lt;/&gt;)</code></li>
-          <li>Copy objek <code>firebaseConfig</code>, tempel di kode ini (cari komentar <code>GANTI DI SINI</code>)</li>
-        </ol>
-      </div>
+      <div class="setup-log" id="setupLog"></div>
       <div class="hidden" id="retryWrap" style="margin-top:18px;">
         <button class="btn" id="retryBtn">↻ coba lagi</button>
       </div>
@@ -524,13 +541,42 @@
   const EMOJI_PILIHAN = ['😀','😂','😍','👍','👎','❤️','🔥','🎉','😢','😮','🙏','😅','😎','🤔','👏','💯'];
   const EMOJI_REAKSI = ['😀','😂','❤️','👍','👎','😮','😢','🔥'];
 
+  const HTML_PERINGATAN_KONFIG =
+    '<div><span class="tag-warn">[PERINGATAN]</span> firebaseConfig belum diisi.</div>' +
+    '<div style="margin-top:10px;">Ruang obrol ini butuh Firebase (gratis) biar pesannya nyambung real-time. Langkahnya:</div>' +
+    '<ol>' +
+    '<li>Buka <code>console.firebase.google.com</code>, bikin project baru (gratis, gak perlu kartu kredit)</li>' +
+    '<li><code>Build → Firestore Database</code> → <code>Create database</code> → pilih <code>mode test</code></li>' +
+    '<li><code>Build → Authentication</code> → <code>Get started</code> → <code>Sign-in method</code> → aktifkan <code>Anonymous</code></li>' +
+    '<li>Klik ikon gerigi <code>Project settings</code> → scroll bawah → <code>Add app → Web (&lt;/&gt;)</code></li>' +
+    '<li>Copy objek <code>firebaseConfig</code>, tempel di kode ini (cari komentar <code>GANTI DI SINI</code>)</li>' +
+    '</ol>';
+
+  const BOOT_LINES = ['memulai ruang-obrol...', 'menyambungkan ke firebase...', 'autentikasi sesi anonim...'];
+
+  function mulaiBootSequence() {
+    const log = document.getElementById('setupLog');
+    log.innerHTML = '';
+    BOOT_LINES.forEach((baris, i) => {
+      setTimeout(() => {
+        if (sudahTersambung) return;
+        const div = document.createElement('div');
+        div.className = 'boot-line';
+        div.textContent = '> ' + baris;
+        log.appendChild(div);
+      }, i * 250);
+    });
+  }
+
   if (belumDikonfigurasi) {
+    document.getElementById('setupLog').innerHTML = HTML_PERINGATAN_KONFIG;
     titleStatus.textContent = 'belum terkonfigurasi';
     setWarna(statusDot, 'var(--danger)');
   } else {
     firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
     db = firebase.firestore();
+    mulaiBootSequence();
     if (navigator.onLine) {
       cobaLogin();
     } else {
@@ -721,16 +767,21 @@
     return warna[Math.abs(hash) % warna.length];
   }
 
+  function waktuRelatif(ms) {
+    const detik = Math.floor((Date.now() - ms) / 1000);
+    if (detik < 60) return 'barusan';
+    const menit = Math.floor(detik / 60);
+    if (menit < 60) return menit + ' menit lalu';
+    const jam = Math.floor(menit / 60);
+    if (jam < 24) return jam + ' jam lalu';
+    return Math.floor(jam / 24) + ' hari lalu';
+  }
+
   function teksTerakhirAktif(uid) {
     const profil = profilCache[uid];
     if (!profil || !profil.terakhirAktif || !profil.terakhirAktif.toMillis) return 'status tidak diketahui';
     if (apakahOnline(uid)) return 'online';
-    const menit = Math.floor((Date.now() - profil.terakhirAktif.toMillis()) / 60000);
-    if (menit < 1) return 'baru saja aktif';
-    if (menit < 60) return 'terakhir dilihat ' + menit + ' menit lalu';
-    const jam = Math.floor(menit / 60);
-    if (jam < 24) return 'terakhir dilihat ' + jam + ' jam lalu';
-    return 'terakhir dilihat ' + Math.floor(jam / 24) + ' hari lalu';
+    return 'terakhir dilihat ' + waktuRelatif(profil.terakhirAktif.toMillis());
   }
 
   function renderAvatar(uid, nama) {
@@ -765,8 +816,11 @@
         const d = doc.data();
         const div = document.createElement('div');
         div.className = 'room-item';
+        div.style.borderLeftColor = warnaDariNama(d.nama || doc.id);
         const iconKunci = d.kunci ? '🔒 ' : '';
-        div.innerHTML = '<span class="room-hash">#</span> ' + iconKunci + escapeHtml(d.nama || doc.id);
+        const waktuLalu = (d.waktuDibuat && d.waktuDibuat.toMillis) ? 'dibuat ' + waktuRelatif(d.waktuDibuat.toMillis()) : '';
+        div.innerHTML = '<span class="room-hash">#</span> ' + iconKunci + escapeHtml(d.nama || doc.id) +
+          (waktuLalu ? '<div class="room-meta">' + waktuLalu + '</div>' : '');
         div.addEventListener('click', () => {
           roomDicoba = doc.id;
           namaRoomDicoba = d.nama || doc.id;
@@ -872,6 +926,18 @@
           else if (change.type === 'removed') hapusElemenPesan(change.doc.id);
         });
 
+        if (wrap.querySelectorAll('[data-id]').length === 0) {
+          if (!wrap.querySelector('.chat-kosong')) {
+            const kosong = document.createElement('div');
+            kosong.className = 'chat-kosong';
+            kosong.textContent = 'belum ada obrolan di sini — jadi yang pertama! 👋';
+            wrap.appendChild(kosong);
+          }
+        } else {
+          const elKosong = wrap.querySelector('.chat-kosong');
+          if (elKosong) elKosong.remove();
+        }
+
         if (dulunyaDiBawah) wrap.scrollTop = wrap.scrollHeight;
 
         if (!snapshotPertama && notifDiizinkan && (document.hidden || !document.hasFocus())) {
@@ -896,7 +962,9 @@
       perbaruiPesanTunggal(id, m);
       return;
     }
-    wrap.appendChild(buatElemenPesan(id, m));
+    const el = buatElemenPesan(id, m);
+    el.classList.add('msg-baru');
+    wrap.appendChild(el);
   }
 
   function perbaruiPesanTunggal(id, m) {
