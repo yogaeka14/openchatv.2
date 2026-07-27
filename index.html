@@ -341,6 +341,25 @@
     outline-offset: 2px;
   }
 
+  .update-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2000; padding: 20px;
+  }
+  .update-modal {
+    background: var(--panel); border: 1px solid var(--green-dim);
+    border-radius: 8px; padding: 22px; max-width: 360px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .update-modal h3 {
+    margin: 0 0 4px; color: var(--green); font-size: 19px;
+    text-shadow: 0 0 10px rgba(110,231,168,0.4);
+  }
+  .update-modal .versi { color: var(--text-dim); font-size: 11.5px; margin-bottom: 14px; }
+  .update-modal ul { list-style: none; margin: 0 0 18px; padding: 0; }
+  .update-modal li { font-size: 13.5px; margin-bottom: 9px; line-height: 1.4; }
+  .update-modal .btn { width: 100%; align-self: stretch; text-align: center; }
+
   .hidden { display: none !important; }
 
   ::-webkit-scrollbar { width: 6px; }
@@ -440,6 +459,21 @@
         <input type="file" id="gambarInput" accept="image/*" style="display:none;">
         <button class="send-btn" id="sendBtn">kirim ↵</button>
       </div>
+    </div>
+  </div>
+
+  <div class="update-overlay hidden" id="updateOverlay">
+    <div class="update-modal">
+      <h3>🆕 Update Terbaru</h3>
+      <div class="versi">ruang-obrol · fitur baru ditambahkan</div>
+      <ul>
+        <li>↩ Balas, ✎ edit, 🗑 hapus pesan — tap pesan buat liat opsinya</li>
+        <li>😀 Emoji & reaksi cepat di tiap pesan</li>
+        <li>📎 Kirim gambar (otomatis dikompres biar ringan)</li>
+        <li>🔔 Notifikasi pesan baru — aktifin di header ruangan</li>
+        <li>🔒 Ruangan sekarang bisa dikunci pakai kata sandi opsional</li>
+      </ul>
+      <button class="btn" id="tutupUpdateBtn">$ oke, mengerti</button>
     </div>
   </div>
 
@@ -613,11 +647,28 @@
     namaSaya = val;
     titlePath.textContent = namaSaya + '@ruang-obrol';
     mulaiHeartbeat();
+    cekPemberitahuanUpdate();
     joinScreen.classList.add('hidden');
     roomScreen.classList.remove('hidden');
     muatDaftarRoom();
     document.getElementById('roomInput').focus();
   }
+
+  const VERSI_UPDATE = 'update-2026-07-fitur-lengkap';
+
+  function cekPemberitahuanUpdate() {
+    db.collection('profiles').doc(uidSaya).get().then((doc) => {
+      const data = doc.exists ? doc.data() : {};
+      if (data.dilihatUpdate !== VERSI_UPDATE) {
+        document.getElementById('updateOverlay').classList.remove('hidden');
+      }
+    }).catch(() => {});
+  }
+
+  document.getElementById('tutupUpdateBtn').addEventListener('click', () => {
+    document.getElementById('updateOverlay').classList.add('hidden');
+    db.collection('profiles').doc(uidSaya).set({ dilihatUpdate: VERSI_UPDATE }, { merge: true }).catch(() => {});
+  });
 
   function simpanProfil() {
     const data = { nama: namaSaya, terakhirAktif: firebase.firestore.FieldValue.serverTimestamp() };
@@ -670,15 +721,28 @@
     return warna[Math.abs(hash) % warna.length];
   }
 
+  function teksTerakhirAktif(uid) {
+    const profil = profilCache[uid];
+    if (!profil || !profil.terakhirAktif || !profil.terakhirAktif.toMillis) return 'status tidak diketahui';
+    if (apakahOnline(uid)) return 'online';
+    const menit = Math.floor((Date.now() - profil.terakhirAktif.toMillis()) / 60000);
+    if (menit < 1) return 'baru saja aktif';
+    if (menit < 60) return 'terakhir dilihat ' + menit + ' menit lalu';
+    const jam = Math.floor(menit / 60);
+    if (jam < 24) return 'terakhir dilihat ' + jam + ' jam lalu';
+    return 'terakhir dilihat ' + Math.floor(jam / 24) + ' hari lalu';
+  }
+
   function renderAvatar(uid, nama) {
     const profil = profilCache[uid];
     const foto = profil && profil.foto;
-    const dot = '<span class="status-dot-inline" data-uid="' + uid + '" style="background:' + (apakahOnline(uid) ? 'var(--green)' : 'var(--text-dim)') + '"></span>';
+    const judul = escapeHtml(nama || '') + ' — ' + teksTerakhirAktif(uid);
+    const dot = '<span class="status-dot-inline" data-uid="' + uid + '" title="' + judul + '" style="background:' + (apakahOnline(uid) ? 'var(--green)' : 'var(--text-dim)') + '"></span>';
     if (foto) {
-      return '<span class="avatar" style="background-image:url(' + foto + ')"></span>' + dot;
+      return '<span class="avatar" title="' + judul + '" style="background-image:url(' + foto + ')"></span>' + dot;
     }
     const huruf = (nama || '?').trim().charAt(0).toUpperCase();
-    return '<span class="avatar" style="background:' + warnaDariNama(nama || uid) + '">' + escapeHtml(huruf) + '</span>' + dot;
+    return '<span class="avatar" title="' + judul + '" style="background:' + warnaDariNama(nama || uid) + '">' + escapeHtml(huruf) + '</span>' + dot;
   }
 
   function buatRoomId(nama) {
@@ -800,9 +864,15 @@
       .limitToLast(200)
       .onSnapshot((snapshot) => {
         const wrap = document.getElementById('messages');
-        wrap.innerHTML = '';
-        snapshot.forEach((doc) => tampilkanPesan(doc.id, doc.data()));
-        wrap.scrollTop = wrap.scrollHeight;
+        const dulunyaDiBawah = snapshotPertama || (wrap.scrollTop + wrap.clientHeight) >= (wrap.scrollHeight - 40);
+
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') tampilkanPesan(change.doc.id, change.doc.data());
+          else if (change.type === 'modified') perbaruiPesanTunggal(change.doc.id, change.doc.data());
+          else if (change.type === 'removed') hapusElemenPesan(change.doc.id);
+        });
+
+        if (dulunyaDiBawah) wrap.scrollTop = wrap.scrollHeight;
 
         if (!snapshotPertama && notifDiizinkan && (document.hidden || !document.hasFocus())) {
           snapshot.docChanges().forEach((change) => {
@@ -821,16 +891,38 @@
   }
 
   function tampilkanPesan(id, m) {
-    pesanCache[id] = m;
     const wrap = document.getElementById('messages');
+    if (wrap.querySelector('[data-id="' + id + '"]')) {
+      perbaruiPesanTunggal(id, m);
+      return;
+    }
+    wrap.appendChild(buatElemenPesan(id, m));
+  }
+
+  function perbaruiPesanTunggal(id, m) {
+    const wrap = document.getElementById('messages');
+    const lama = wrap.querySelector('[data-id="' + id + '"]');
+    const baru = buatElemenPesan(id, m);
+    if (lama) lama.replaceWith(baru);
+    else wrap.appendChild(baru);
+  }
+
+  function hapusElemenPesan(id) {
+    const wrap = document.getElementById('messages');
+    const el = wrap.querySelector('[data-id="' + id + '"]');
+    if (el) el.remove();
+    delete pesanCache[id];
+  }
+
+  function buatElemenPesan(id, m) {
+    pesanCache[id] = m;
     const div = document.createElement('div');
     div.setAttribute('data-id', id);
 
     if (m.sistem) {
       div.className = 'msg system';
       div.textContent = '— ' + m.teks + ' —';
-      wrap.appendChild(div);
-      return;
+      return div;
     }
 
     const milikSaya = m.uid === uidSaya;
@@ -873,7 +965,7 @@
       '<span class="nama">' + escapeHtml(m.nama) + '&gt;</span> ' +
       isi + aksi +
       '</span>';
-    wrap.appendChild(div);
+    return div;
   }
 
   function potong(str, n) {
