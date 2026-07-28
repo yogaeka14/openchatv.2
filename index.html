@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>~/ruang-obrol</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0f0d">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f0d;
+    --panel: #0f1613;
+    --panel-2: #131b17;
+    --green: #6EE7A8;
+    --green-dim: #3f8f66;
+    --amber: #F0B429;
+    --text: #d3ded8;
+    --text-dim: #6b7a74;
+    --border: #1c2a24;
+    --danger: #e8664a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background-image: radial-gradient(ellipse at top, rgba(110,231,168,0.06), transparent 60%);
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+    z-index: 999;
+  }
+
+  .terminal {
+    width: 100%;
+    max-width: 480px;
+    height: min(680px, 92vh);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(110,231,168,0.05), 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .titlebar {
+    padding: 10px 14px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .titlebar .path { color: var(--green); }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 6px var(--green);
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .blink-char {
+    color: var(--green);
+    margin-left: 3px;
+    animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .blink-char { animation: none; }
+  }
+
+  .screen { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 28px; overflow-y: auto; }
+  .ascii-title {
+    font-family: 'VT323', monospace;
+    font-size: 40px;
+    color: var(--green);
+    text-shadow: 0 0 12px rgba(110,231,168,0.5);
+    line-height: 1.1;
+    margin-bottom: 2px;
+  }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 26px; }
+  .prompt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+  .prompt-symbol { color: var(--green); }
+  .join-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px;
+    padding: 6px 2px;
+    outline: none;
+  }
+  .join-input:focus { border-bottom-color: var(--green); }
+  .btn {
+    background: var(--green);
+    color: #05130c;
+    border: none;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 10px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    align-self: flex-start;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:active { transform: translateY(1px); }
+  .hint { color: var(--danger); font-size: 12px; margin-top: 8px; min-height: 14px; }
+
+  .setup-log { font-size: 13px; line-height: 1.7; color: var(--text-dim); }
+  .setup-log .tag-warn { color: var(--amber); }
+  .setup-log ol { margin: 10px 0 0 18px; padding: 0; color: var(--text); }
+  .setup-log li { margin-bottom: 6px; }
+  .setup-log code {
+    background: var(--panel-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--green);
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .msg { font-size: 14px; line-height: 1.5; display: flex; align-items: flex-start; gap: 6px; }
+  .msg-text { flex: 1; min-width: 0; }
+  .msg .meta { color: var(--text-dim); font-size: 11.5px; margin-right: 6px; }
+  .msg .nama { font-weight: 700; }
+  .msg.me .nama { color: var(--green); }
+  .msg.other .nama { color: var(--amber); }
+  .msg .teks { color: var(--text); word-break: break-word; }
+  .msg.system { color: var(--text-dim); font-style: italic; font-size: 12.5px; }
+
+  .avatar {
+    width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+    background-size: cover; background-position: center;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #05130c;
+    margin-top: 1px;
+  }
+  .status-dot-inline {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0; margin-top: 6px;
+  }
+
+  .foto-picker-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .foto-preview {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 1px dashed var(--border);
+    background-size: cover; background-position: center;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); font-size: 22px; cursor: pointer;
+    flex-shrink: 0;
+  }
+  .foto-preview.ada-foto { border-style: solid; border-color: var(--green-dim); color: transparent; }
+  .foto-hint { color: var(--text-dim); font-size: 12px; }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--panel-2);
+    flex-shrink: 0;
+  }
+  .input-row .prompt-symbol { color: var(--green); font-weight: 700; }
+  .msg-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px;
+    outline: none;
+    min-width: 0;
+  }
+  .send-btn {
+    background: transparent;
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    font-family: inherit;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: rgba(110,231,168,0.1); }
+
+  .icon-btn {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 6px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .icon-btn:hover { filter: brightness(1.3); }
+
+  .above-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--panel-2);
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+  .above-input .label { color: var(--amber); font-weight: 700; }
+  .above-input button {
+    background: transparent; border: none; color: var(--text-dim);
+    cursor: pointer; font-size: 14px; padding: 2px 6px; flex-shrink: 0;
+  }
+  .above-input img { height: 32px; width: 32px; object-fit: cover; border-radius: 4px; }
+
+  .emoji-panel {
+    position: absolute;
+    bottom: 56px;
+    right: 14px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    z-index: 10;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  .emoji-panel span { cursor: pointer; font-size: 19px; text-align: center; padding: 3px; border-radius: 4px; }
+  .emoji-panel span:hover { background: rgba(110,231,168,0.12); }
+
+  .aksi-row { display: flex; gap: 10px; margin-top: 4px; }
+  .aksi-row.hidden { display: none !important; }
+  .aksi-row button {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    font-size: 12px; padding: 2px 8px; border-radius: 10px; cursor: pointer;
+  }
+  .aksi-row button:hover { border-color: var(--green-dim); color: var(--green); }
+
+  .reaksi-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .reaksi-pill {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 12px; padding: 1px 7px; cursor: pointer;
+  }
+  .reaksi-pill.aktif { border-color: var(--green); background: rgba(110,231,168,0.12); }
+
+  .reaksi-picker {
+    display: inline-flex; gap: 4px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 4px 6px; margin-top: 4px; position: relative; z-index: 5;
+  }
+  .reaksi-picker span { cursor: pointer; font-size: 16px; }
+
+  .balasan-preview {
+    border-left: 2px solid var(--green-dim);
+    padding-left: 6px;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+  .teks-dihapus { color: var(--text-dim); font-style: italic; }
+  .tag-diedit { color: var(--text-dim); font-size: 11px; font-style: italic; }
+
+  .pesan-gambar {
+    max-width: 180px; max-height: 180px; border-radius: 6px;
+    display: block; margin: 4px 0; cursor: pointer;
+  }
+  .lightbox-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+  }
+  .lightbox-overlay img { max-width: 100%; max-height: 100%; border-radius: 4px; }
+
+  .room-list { max-height: 220px; overflow-y: auto; margin-bottom: 18px; }
+  .room-item {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .room-item:hover { border-color: var(--green-dim); background: rgba(110,231,168,0.05); }
+  .room-item .room-hash { color: var(--green); font-weight: 700; }
+  .room-loading { color: var(--text-dim); font-size: 13px; font-style: italic; }
+
+  .room-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+    flex-shrink: 0;
+  }
+  .room-header #roomLabel { color: var(--amber); font-weight: 700; }
+  .switch-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 2px 4px;
+  }
+  .switch-btn:hover { color: var(--green); }
+
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+  }
+
+  .update-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2000; padding: 20px;
+  }
+  .update-modal {
+    background: var(--panel); border: 1px solid var(--green-dim);
+    border-radius: 8px; padding: 22px; max-width: 360px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .update-modal h3 {
+    margin: 0 0 4px; color: var(--green); font-size: 19px;
+    text-shadow: 0 0 10px rgba(110,231,168,0.4);
+  }
+  .update-modal .versi { color: var(--text-dim); font-size: 11.5px; margin-bottom: 14px; }
+  .update-modal ul { list-style: none; margin: 0 0 18px; padding: 0; }
+  .update-modal li { font-size: 13.5px; margin-bottom: 9px; line-height: 1.4; }
+  .update-modal .btn { width: 100%; align-self: stretch; text-align: center; }
+
+  .hidden { display: none !important; }
+
+  .boot-line {
+    color: var(--text-dim); font-size: 13px; margin-bottom: 6px;
+    animation: fadeInBoot 0.3s ease;
+  }
+  @keyframes fadeInBoot {
+    from { opacity: 0; transform: translateX(-4px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pesanMasuk {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg-baru { animation: pesanMasuk 0.25s ease; }
+
+  .chat-kosong {
+    text-align: center; color: var(--text-dim); font-size: 13px;
+    font-style: italic; margin: auto; padding: 30px 20px;
+  }
+
+  .divider-tanggal {
+    text-align: center; color: var(--text-dim); font-size: 11px;
+    margin: 8px 0; letter-spacing: 0.5px; position: relative;
+  }
+  .divider-tanggal::before, .divider-tanggal::after {
+    content: ''; position: absolute; top: 50%; width: 28%; height: 1px; background: var(--border);
+  }
+  .divider-tanggal::before { left: 4px; }
+  .divider-tanggal::after { right: 4px; }
+
+  #indikatorKetik {
+    padding: 4px 14px; font-size: 12px; color: var(--text-dim); font-style: italic;
+    flex-shrink: 0; background: var(--panel-2);
+  }
+
+  .room-meta { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .boot-line, .msg-baru { animation: none; }
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 520px) {
+    .terminal { height: 100vh; max-width: 100%; border-radius: 0; border: none; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="terminal">
+    <div class="titlebar">
+      <span><span class="status-dot" id="statusDot"></span><span class="path" id="titlePath">tamu@ruang-obrol</span>:~$</span>
+      <span><span id="titleStatus">menghubungkan</span><span class="blink-char">▊</span></span>
+    </div>
+
+    <div class="screen" id="setupScreen">
+      <div class="setup-log" id="setupLog"></div>
+      <div class="hidden" id="retryWrap" style="margin-top:18px;">
+        <button class="btn" id="retryBtn">↻ coba lagi</button>
+      </div>
+    </div>
+
+    <div class="screen hidden" id="joinScreen">
+      <div class="ascii-title">ruang-obrol</div>
+      <div class="subtitle"># chat real-time sederhana</div>
+      <div class="prompt-row">
+        <span class="prompt-symbol">&gt;</span>
+        <input type="text" class="join-input" id="namaInput" placeholder="siapa nama kamu?" maxlength="24" autocomplete="off">
+      </div>
+      <div class="foto-picker-row">
+        <label class="foto-preview" id="previewFoto" for="fotoInput">+</label>
+        <input type="file" id="fotoInput" accept="image/*" style="display:none;">
+        <span class="foto-hint">foto profil (opsional)</span>
+      </div>
+      <button class="btn" id="joinBtn">$ masuk</button>
+      <div class="hint" id="joinError"></div>
+    </div>
+
+    <div class="screen hidden" id="roomScreen">
+      <div class="subtitle" style="margin-bottom:14px;"># pilih atau bikin ruangan obrol</div>
+      <div class="room-list" id="daftarRoom"></div>
+      <div class="prompt-row">
+        <span class="prompt-symbol">#</span>
+        <input type="text" class="join-input" id="roomInput" placeholder="nama ruangan baru/lama" maxlength="30" autocomplete="off">
+      </div>
+      <div class="prompt-row">
+        <span class="prompt-symbol">🔒</span>
+        <input type="password" class="join-input" id="roomKunciInput" placeholder="kunci ruangan (opsional)" maxlength="30" autocomplete="off">
+      </div>
+      <button class="btn" id="roomJoinBtn">$ masuk ruangan</button>
+      <div class="hint" id="roomError"></div>
+    </div>
+
+    <div class="screen hidden" id="chatScreen" style="padding:0; justify-content:flex-start; position:relative;">
+      <div class="room-header">
+        <span id="roomLabel">#</span>
+        <span>
+          <button class="switch-btn" id="notifBtn">🔔 aktifkan notifikasi</button>
+          <button class="switch-btn" id="switchRoomBtn">← ganti ruangan</button>
+        </span>
+      </div>
+      <div class="messages" id="messages"></div>
+
+      <div class="above-input hidden" id="balasPreview">
+        <span><span class="label">↩ balas:</span> <span id="balasPreviewTeks"></span></span>
+        <button id="batalBalasBtn" aria-label="batal balas">✕</button>
+      </div>
+      <div class="above-input hidden" id="editPreview">
+        <span><span class="label">✎ mengedit pesan</span></span>
+        <button id="batalEditBtn" aria-label="batal edit">✕</button>
+      </div>
+      <div class="above-input hidden" id="gambarPreviewBar">
+        <span style="display:flex; align-items:center; gap:8px;"><img id="gambarPreviewImg"><span class="label">gambar siap dikirim</span></span>
+        <button id="batalGambarBtn" aria-label="batal kirim gambar">✕</button>
+      </div>
+
+      <div class="emoji-panel hidden" id="emojiPanel"></div>
+      <div class="hidden" id="indikatorKetik"></div>
+
+      <div class="input-row">
+        <span class="prompt-symbol">&gt;</span>
+        <input type="text" class="msg-input" id="msgInput" placeholder="ketik pesan…" autocomplete="off">
+        <button class="icon-btn" id="emojiBtn" type="button" aria-label="pilih emoji">😀</button>
+        <label class="icon-btn" for="gambarInput" aria-label="kirim gambar">📎</label>
+        <input type="file" id="gambarInput" accept="image/*" style="display:none;">
+        <button class="send-btn" id="sendBtn">kirim ↵</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="update-overlay hidden" id="updateOverlay">
+    <div class="update-modal">
+      <h3>🆕 Update Terbaru</h3>
+      <div class="versi">ruang-obrol · fitur baru ditambahkan</div>
+      <ul>
+        <li>↩ Balas, ✎ edit, 🗑 hapus pesan — tap pesan buat liat opsinya</li>
+        <li>😀 Emoji & reaksi cepat di tiap pesan</li>
+        <li>📎 Kirim gambar (otomatis dikompres biar ringan)</li>
+        <li>🔔 Notifikasi pesan baru — aktifin di header ruangan</li>
+        <li>🔒 Ruangan sekarang bisa dikunci pakai kata sandi opsional</li>
+      </ul>
+      <button class="btn" id="tutupUpdateBtn">$ oke, mengerti</button>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-auth-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.15.0/firebase-firestore-compat.min.js"></script>
+<script>
+  // ============================================
+  // Config project Firebase kamu (last-project-maybe)
+  // ============================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyAu6rIUlgOMXaPQpg2Ym1rWJUguScNh2io",
+    authDomain: "last-project-maybe.firebaseapp.com",
+    projectId: "last-project-maybe",
+    storageBucket: "last-project-maybe.firebasestorage.app",
+    messagingSenderId: "301694011914",
+    appId: "1:301694011914:web:f60242b6e4f88f875eadf3",
+    measurementId: "G-FEGJWN8VCK"
+  };
+  // ============================================
+
+  const belumDikonfigurasi = firebaseConfig.apiKey === "GANTI_DENGAN_API_KEY_KAMU";
+
+  const setupScreen = document.getElementById('setupScreen');
+  const joinScreen = document.getElementById('joinScreen');
+  const roomScreen = document.getElementById('roomScreen');
+  const chatScreen = document.getElementById('chatScreen');
+  const titleStatus = document.getElementById('titleStatus');
+  const titlePath = document.getElementById('titlePath');
+  const statusDot = document.getElementById('statusDot');
+
+  let db, auth, namaSaya, uidSaya;
+  let sudahTersambung = false;
+  let percobaan = 0;
+  const MAKS_PERCOBAAN = 4;
+  let roomAktif = null;
+  let lepasListenerPesan = null;
+  let fotoSaya = null;
+  let heartbeatTimer = null;
+  const profilCache = {};
+  const AMBANG_ONLINE = 50000; // ms — dianggap online kalau aktif dalam 50 detik terakhir
+
+  const pesanCache = {}; // id -> data pesan, buat referensi balas/edit
+  let balasKe = null; // {nama, teks} pesan yang lagi dibalas
+  let sedangEdit = null; // id pesan yang lagi diedit
+  let gambarPending = null; // dataURL gambar yang siap dikirim
+  let notifDiizinkan = (typeof Notification !== 'undefined' && Notification.permission === 'granted');
+  const EMOJI_PILIHAN = ['😀','😂','😍','👍','👎','❤️','🔥','🎉','😢','😮','🙏','😅','😎','🤔','👏','💯'];
+  const EMOJI_REAKSI = ['😀','😂','❤️','👍','👎','😮','😢','🔥'];
+
+  let lepasListenerKetik = null;
+  let ketikTimer = null;
+  let terakhirTulisKetik = 0;
+
+  const HTML_PERINGATAN_KONFIG =
+    '<div><span class="tag-warn">[PERINGATAN]</span> firebaseConfig belum diisi.</div>' +
+    '<div style="margin-top:10px;">Ruang obrol ini butuh Firebase (gratis) biar pesannya nyambung real-time. Langkahnya:</div>' +
+    '<ol>' +
+    '<li>Buka <code>console.firebase.google.com</code>, bikin project baru (gratis, gak perlu kartu kredit)</li>' +
+    '<li><code>Build → Firestore Database</code> → <code>Create database</code> → pilih <code>mode test</code></li>' +
+    '<li><code>Build → Authentication</code> → <code>Get started</code> → <code>Sign-in method</code> → aktifkan <code>Anonymous</code></li>' +
+    '<li>Klik ikon gerigi <code>Project settings</code> → scroll bawah → <code>Add app → Web (&lt;/&gt;)</code></li>' +
+    '<li>Copy objek <code>firebaseConfig</code>, tempel di kode ini (cari komentar <code>GANTI DI SINI</code>)</li>' +
+    '</ol>';
+
+  const BOOT_LINES = ['memulai ruang-obrol...', 'menyambungkan ke firebase...', 'autentikasi sesi anonim...'];
+
+  function mulaiBootSequence() {
+    const log = document.getElementById('setupLog');
+    log.innerHTML = '';
+    BOOT_LINES.forEach((baris, i) => {
+      setTimeout(() => {
+        if (sudahTersambung) return;
+        const div = document.createElement('div');
+        div.className = 'boot-line';
+        div.textContent = '> ' + baris;
+        log.appendChild(div);
+      }, i * 250);
+    });
+  }
+
+  if (belumDikonfigurasi) {
+    document.getElementById('setupLog').innerHTML = HTML_PERINGATAN_KONFIG;
+    titleStatus.textContent = 'belum terkonfigurasi';
+    setWarna(statusDot, 'var(--danger)');
+  } else {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    mulaiBootSequence();
+    if (navigator.onLine) {
+      cobaLogin();
+    } else {
+      titleStatus.textContent = 'nunggu internet';
+      setWarna(statusDot, 'var(--danger)');
+    }
+  }
+
+  window.addEventListener('online', () => {
+    if (!belumDikonfigurasi && !sudahTersambung) {
+      percobaan = 0;
+      cobaLogin();
+    }
+  });
+  window.addEventListener('offline', () => {
+    if (!sudahTersambung) {
+      titleStatus.textContent = 'nunggu internet';
+      setWarna(statusDot, 'var(--danger)');
+    }
+  });
+
+  function setWarna(el, warna) {
+    el.style.background = warna;
+    el.style.boxShadow = '0 0 6px ' + warna;
+  }
+
+  function cobaLogin() {
+    titleStatus.textContent = percobaan > 0 ? ('coba lagi (' + percobaan + '/' + MAKS_PERCOBAAN + ')') : 'menghubungkan';
+    setWarna(statusDot, 'var(--amber)');
+    auth.signInAnonymously().then((cred) => {
+      percobaan = 0;
+      sudahTersambung = true;
+      uidSaya = cred.user.uid;
+      titleStatus.textContent = 'tersambung';
+      setWarna(statusDot, 'var(--green)');
+      setupScreen.classList.add('hidden');
+      joinScreen.classList.remove('hidden');
+      document.getElementById('namaInput').focus();
+      dengarkanProfil();
+    }).catch((err) => {
+      percobaan++;
+      if (percobaan <= MAKS_PERCOBAAN && navigator.onLine) {
+        setTimeout(cobaLogin, Math.min(2000 * percobaan, 8000));
+      } else {
+        tampilkanErrorSetup(err);
+      }
+    });
+  }
+
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    percobaan = 0;
+    document.getElementById('retryWrap').classList.add('hidden');
+    setupScreen.querySelector('.setup-log').innerHTML = '<span class="tag-warn">[INFO]</span> mencoba tersambung lagi…';
+    cobaLogin();
+  });
+
+  function tampilkanErrorSetup(err) {
+    titleStatus.textContent = 'gagal tersambung';
+    setWarna(statusDot, 'var(--danger)');
+    joinScreen.classList.add('hidden');
+    chatScreen.classList.add('hidden');
+    setupScreen.classList.remove('hidden');
+    setupScreen.querySelector('.setup-log').innerHTML =
+      '<span class="tag-warn">[ERROR]</span> ' + escapeHtml(err.message) +
+      '<div style="margin-top:8px;">Kemungkinan penyebab: koneksi internet lagi nggak stabil, atau firebaseConfig/Anonymous sign-in belum bener diaktifkan.</div>';
+    document.getElementById('retryWrap').classList.remove('hidden');
+  }
+
+  document.getElementById('joinBtn').addEventListener('click', masuk);
+  document.getElementById('namaInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') masuk();
+  });
+
+  document.getElementById('fotoInput').addEventListener('change', (e) => {
+    prosesFoto(e.target.files[0]);
+  });
+
+  function prosesFoto(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      document.getElementById('joinError').textContent = 'file harus berupa gambar';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const UKURAN = 80;
+        const canvas = document.createElement('canvas');
+        canvas.width = UKURAN;
+        canvas.height = UKURAN;
+        const ctx = canvas.getContext('2d');
+        const sisi = Math.min(img.width, img.height);
+        const sx = (img.width - sisi) / 2;
+        const sy = (img.height - sisi) / 2;
+        ctx.drawImage(img, sx, sy, sisi, sisi, 0, 0, UKURAN, UKURAN);
+        fotoSaya = canvas.toDataURL('image/jpeg', 0.7);
+        const preview = document.getElementById('previewFoto');
+        preview.style.backgroundImage = 'url(' + fotoSaya + ')';
+        preview.classList.add('ada-foto');
+        preview.textContent = '';
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function masuk() {
+    const val = document.getElementById('namaInput').value.trim();
+    if (!val) {
+      document.getElementById('joinError').textContent = 'isi nama dulu ya';
+      return;
+    }
+    namaSaya = val;
+    titlePath.textContent = namaSaya + '@ruang-obrol';
+    mulaiHeartbeat();
+    cekPemberitahuanUpdate();
+    joinScreen.classList.add('hidden');
+    roomScreen.classList.remove('hidden');
+    muatDaftarRoom();
+    document.getElementById('roomInput').focus();
+  }
+
+  const VERSI_UPDATE = 'update-2026-07-fitur-lengkap';
+
+  function cekPemberitahuanUpdate() {
+    db.collection('profiles').doc(uidSaya).get().then((doc) => {
+      const data = doc.exists ? doc.data() : {};
+      if (data.dilihatUpdate !== VERSI_UPDATE) {
+        document.getElementById('updateOverlay').classList.remove('hidden');
+      }
+    }).catch(() => {});
+  }
+
+  document.getElementById('tutupUpdateBtn').addEventListener('click', () => {
+    document.getElementById('updateOverlay').classList.add('hidden');
+    db.collection('profiles').doc(uidSaya).set({ dilihatUpdate: VERSI_UPDATE }, { merge: true }).catch(() => {});
+  });
+
+  function simpanProfil() {
+    const data = { nama: namaSaya, terakhirAktif: firebase.firestore.FieldValue.serverTimestamp() };
+    if (fotoSaya) data.foto = fotoSaya;
+    db.collection('profiles').doc(uidSaya).set(data, { merge: true }).catch(() => {});
+  }
+
+  function mulaiHeartbeat() {
+    simpanProfil();
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(simpanProfil, 25000);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+    } else if (uidSaya && namaSaya && !heartbeatTimer) {
+      mulaiHeartbeat();
+    }
+  });
+
+  function dengarkanProfil() {
+    db.collection('profiles').onSnapshot((snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        profilCache[change.doc.id] = change.doc.data();
+      });
+      perbaruiStatusDot();
+    });
+  }
+
+  setInterval(perbaruiStatusDot, 15000);
+
+  function perbaruiStatusDot() {
+    document.querySelectorAll('.status-dot-inline').forEach((el) => {
+      const uid = el.getAttribute('data-uid');
+      el.style.background = apakahOnline(uid) ? 'var(--green)' : 'var(--text-dim)';
+    });
+  }
+
+  function apakahOnline(uid) {
+    const profil = profilCache[uid];
+    if (!profil || !profil.terakhirAktif || !profil.terakhirAktif.toMillis) return false;
+    return (Date.now() - profil.terakhirAktif.toMillis()) < AMBANG_ONLINE;
+  }
+
+  function warnaDariNama(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    const warna = ['#6EE7A8', '#F0B429', '#60A5FA', '#F472B6', '#A78BFA', '#34D399', '#FB923C'];
+    return warna[Math.abs(hash) % warna.length];
+  }
+
+  function waktuRelatif(ms) {
+    const detik = Math.floor((Date.now() - ms) / 1000);
+    if (detik < 60) return 'barusan';
+    const menit = Math.floor(detik / 60);
+    if (menit < 60) return menit + ' menit lalu';
+    const jam = Math.floor(menit / 60);
+    if (jam < 24) return jam + ' jam lalu';
+    return Math.floor(jam / 24) + ' hari lalu';
+  }
+
+  function teksTerakhirAktif(uid) {
+    const profil = profilCache[uid];
+    if (!profil || !profil.terakhirAktif || !profil.terakhirAktif.toMillis) return 'status tidak diketahui';
+    if (apakahOnline(uid)) return 'online';
+    return 'terakhir dilihat ' + waktuRelatif(profil.terakhirAktif.toMillis());
+  }
+
+  function renderAvatar(uid, nama) {
+    const profil = profilCache[uid];
+    const foto = profil && profil.foto;
+    const judul = escapeHtml(nama || '') + ' — ' + teksTerakhirAktif(uid);
+    const dot = '<span class="status-dot-inline" data-uid="' + uid + '" title="' + judul + '" style="background:' + (apakahOnline(uid) ? 'var(--green)' : 'var(--text-dim)') + '"></span>';
+    if (foto) {
+      return '<span class="avatar" title="' + judul + '" style="background-image:url(' + foto + ')"></span>' + dot;
+    }
+    const huruf = (nama || '?').trim().charAt(0).toUpperCase();
+    return '<span class="avatar" title="' + judul + '" style="background:' + warnaDariNama(nama || uid) + '">' + escapeHtml(huruf) + '</span>' + dot;
+  }
+
+  function buatRoomId(nama) {
+    return nama.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  let roomDicoba = null;
+  let namaRoomDicoba = null;
+
+  function muatDaftarRoom() {
+    const wrap = document.getElementById('daftarRoom');
+    wrap.innerHTML = '<div class="room-loading">memuat daftar ruangan…</div>';
+    db.collection('rooms').orderBy('waktuDibuat', 'desc').limit(30).get().then((snapshot) => {
+      if (snapshot.empty) {
+        wrap.innerHTML = '<div class="room-loading">belum ada ruangan — bikin yang pertama di bawah ↓</div>';
+        return;
+      }
+      wrap.innerHTML = '';
+      snapshot.forEach((doc) => {
+        const d = doc.data();
+        const div = document.createElement('div');
+        div.className = 'room-item';
+        div.style.borderLeftColor = warnaDariNama(d.nama || doc.id);
+        const iconKunci = d.kunci ? '🔒 ' : '';
+        const waktuLalu = (d.waktuDibuat && d.waktuDibuat.toMillis) ? 'dibuat ' + waktuRelatif(d.waktuDibuat.toMillis()) : '';
+        div.innerHTML = '<span class="room-hash">#</span> ' + iconKunci + escapeHtml(d.nama || doc.id) +
+          (waktuLalu ? '<div class="room-meta">' + waktuLalu + '</div>' : '');
+        div.addEventListener('click', () => {
+          roomDicoba = doc.id;
+          namaRoomDicoba = d.nama || doc.id;
+          masukRoom(doc.id, namaRoomDicoba);
+        });
+        wrap.appendChild(div);
+      });
+    }).catch((err) => {
+      wrap.innerHTML = '<div class="room-loading">gagal muat daftar ruangan: ' + escapeHtml(err.message) + '</div>';
+    });
+  }
+
+  document.getElementById('roomJoinBtn').addEventListener('click', prosesRoomInput);
+  document.getElementById('roomInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') prosesRoomInput();
+  });
+
+  function prosesRoomInput() {
+    const nama = document.getElementById('roomInput').value.trim();
+    if (!nama) return;
+    const id = buatRoomId(nama);
+    if (!id) {
+      document.getElementById('roomError').textContent = 'nama ruangan harus ada huruf/angka';
+      return;
+    }
+    document.getElementById('roomError').textContent = '';
+    roomDicoba = id;
+    namaRoomDicoba = nama;
+    masukRoom(id, nama);
+  }
+
+  document.getElementById('roomKunciInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && roomDicoba) masukRoom(roomDicoba, namaRoomDicoba);
+  });
+
+  function masukRoom(id, nama) {
+    const kunciInput = document.getElementById('roomKunciInput').value;
+    document.getElementById('roomError').textContent = '';
+    db.collection('rooms').doc(id).get().then((doc) => {
+      if (doc.exists && doc.data().kunci) {
+        if (kunciInput !== doc.data().kunci) {
+          document.getElementById('roomError').textContent = kunciInput ? 'kunci salah' : 'ruangan ini terkunci 🔒 — isi kuncinya dulu';
+          document.getElementById('roomKunciInput').focus();
+          return;
+        }
+      }
+      if (!doc.exists) {
+        const dataBaru = {
+          nama: nama,
+          dibuatOleh: namaSaya,
+          waktuDibuat: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        if (kunciInput) dataBaru.kunci = kunciInput;
+        db.collection('rooms').doc(id).set(dataBaru);
+      }
+      lanjutkanMasukRoom(id, nama);
+    }).catch((err) => {
+      document.getElementById('roomError').textContent = 'gagal cek ruangan: ' + err.message;
+    });
+  }
+
+  function lanjutkanMasukRoom(id, nama) {
+    roomAktif = id;
+    roomDicoba = null;
+    namaRoomDicoba = null;
+    titlePath.textContent = namaSaya + '@ruang-obrol:~/' + id;
+    roomScreen.classList.add('hidden');
+    chatScreen.classList.remove('hidden');
+    document.getElementById('roomLabel').textContent = '#' + (nama || id);
+    document.getElementById('roomInput').value = '';
+    document.getElementById('roomKunciInput').value = '';
+    document.getElementById('msgInput').focus();
+
+    dengarkanPesan();
+    dengarkanKetik();
+    kirimSistem(namaSaya + ' bergabung ke ruang obrol');
+  }
+
+  document.getElementById('switchRoomBtn').addEventListener('click', gantiRuangan);
+
+  function gantiRuangan() {
+    if (lepasListenerPesan) { lepasListenerPesan(); lepasListenerPesan = null; }
+    if (lepasListenerKetik) { lepasListenerKetik(); lepasListenerKetik = null; }
+    if (roomAktif && uidSaya) {
+      db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya).delete().catch(() => {});
+    }
+    clearTimeout(ketikTimer);
+    roomAktif = null;
+    chatScreen.classList.add('hidden');
+    roomScreen.classList.remove('hidden');
+    titlePath.textContent = namaSaya + '@ruang-obrol';
+    muatDaftarRoom();
+  }
+
+  function dengarkanKetik() {
+    if (lepasListenerKetik) lepasListenerKetik();
+    lepasListenerKetik = db.collection('rooms').doc(roomAktif).collection('mengetik').onSnapshot((snapshot) => {
+      const namaOrang = [];
+      const sekarang = Date.now();
+      snapshot.forEach((doc) => {
+        if (doc.id === uidSaya) return;
+        const d = doc.data();
+        if (d.waktu && d.waktu.toMillis && (sekarang - d.waktu.toMillis()) < 5000) {
+          namaOrang.push(d.nama);
+        }
+      });
+      const indikator = document.getElementById('indikatorKetik');
+      if (namaOrang.length === 0) {
+        indikator.classList.add('hidden');
+      } else {
+        indikator.textContent = namaOrang.join(', ') + (namaOrang.length > 1 ? ' sedang mengetik...' : ' sedang mengetik...');
+        indikator.classList.remove('hidden');
+      }
+    });
+  }
+
+  document.getElementById('msgInput').addEventListener('input', () => {
+    if (!roomAktif) return;
+    const sekarang = Date.now();
+    if (sekarang - terakhirTulisKetik > 2500) {
+      terakhirTulisKetik = sekarang;
+      db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya)
+        .set({ nama: namaSaya, waktu: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    }
+    clearTimeout(ketikTimer);
+    ketikTimer = setTimeout(() => {
+      db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya).delete().catch(() => {});
+    }, 3000);
+  });
+
+  function teksTanggal(tgl) {
+    const skrg = new Date();
+    const a = new Date(skrg.getFullYear(), skrg.getMonth(), skrg.getDate());
+    const b = new Date(tgl.getFullYear(), tgl.getMonth(), tgl.getDate());
+    const bedaHari = Math.round((a - b) / 86400000);
+    if (bedaHari === 0) return 'hari ini';
+    if (bedaHari === 1) return 'kemarin';
+    return tgl.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  function cekTanggalPembatas(m, wrap) {
+    if (!m.waktu || !m.waktu.toDate) return;
+    const tgl = m.waktu.toDate();
+    const kunci = tgl.getFullYear() + '-' + tgl.getMonth() + '-' + tgl.getDate();
+    if (wrap.getAttribute('data-tanggal-terakhir') === kunci) return;
+    wrap.setAttribute('data-tanggal-terakhir', kunci);
+    const div = document.createElement('div');
+    div.className = 'divider-tanggal';
+    div.textContent = teksTanggal(tgl);
+    wrap.appendChild(div);
+  }
+
+  function dengarkanPesan() {
+    if (lepasListenerPesan) lepasListenerPesan();
+    const wrapAwal = document.getElementById('messages');
+    wrapAwal.innerHTML = '';
+    wrapAwal.removeAttribute('data-tanggal-terakhir');
+    let snapshotPertama = true;
+    lepasListenerPesan = db.collection('rooms').doc(roomAktif).collection('messages')
+      .orderBy('waktu', 'asc')
+      .limitToLast(200)
+      .onSnapshot((snapshot) => {
+        const wrap = document.getElementById('messages');
+        const dulunyaDiBawah = snapshotPertama || (wrap.scrollTop + wrap.clientHeight) >= (wrap.scrollHeight - 40);
+
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') tampilkanPesan(change.doc.id, change.doc.data());
+          else if (change.type === 'modified') perbaruiPesanTunggal(change.doc.id, change.doc.data());
+          else if (change.type === 'removed') hapusElemenPesan(change.doc.id);
+        });
+
+        if (wrap.querySelectorAll('[data-id]').length === 0) {
+          if (!wrap.querySelector('.chat-kosong')) {
+            const kosong = document.createElement('div');
+            kosong.className = 'chat-kosong';
+            kosong.textContent = 'belum ada obrolan di sini — jadi yang pertama! 👋';
+            wrap.appendChild(kosong);
+          }
+        } else {
+          const elKosong = wrap.querySelector('.chat-kosong');
+          if (elKosong) elKosong.remove();
+        }
+
+        if (dulunyaDiBawah) wrap.scrollTop = wrap.scrollHeight;
+
+        if (!snapshotPertama && notifDiizinkan && (document.hidden || !document.hasFocus())) {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const m = change.doc.data();
+              if (!m.sistem && m.uid !== uidSaya) {
+                try {
+                  new Notification(m.nama, { body: m.gambar ? '📷 mengirim gambar' : (m.teks || '') });
+                } catch (e) {}
+              }
+            }
+          });
+        }
+        snapshotPertama = false;
+      }, (err) => tampilkanErrorChat(err));
+  }
+
+  function tampilkanPesan(id, m) {
+    const wrap = document.getElementById('messages');
+    if (wrap.querySelector('[data-id="' + id + '"]')) {
+      perbaruiPesanTunggal(id, m);
+      return;
+    }
+    cekTanggalPembatas(m, wrap);
+    const el = buatElemenPesan(id, m);
+    el.classList.add('msg-baru');
+    wrap.appendChild(el);
+  }
+
+  function perbaruiPesanTunggal(id, m) {
+    const wrap = document.getElementById('messages');
+    const lama = wrap.querySelector('[data-id="' + id + '"]');
+    const baru = buatElemenPesan(id, m);
+    if (lama) lama.replaceWith(baru);
+    else wrap.appendChild(baru);
+  }
+
+  function hapusElemenPesan(id) {
+    const wrap = document.getElementById('messages');
+    const el = wrap.querySelector('[data-id="' + id + '"]');
+    if (el) el.remove();
+    delete pesanCache[id];
+  }
+
+  function buatElemenPesan(id, m) {
+    pesanCache[id] = m;
+    const div = document.createElement('div');
+    div.setAttribute('data-id', id);
+
+    if (m.sistem) {
+      div.className = 'msg system';
+      div.textContent = '— ' + m.teks + ' —';
+      return div;
+    }
+
+    const milikSaya = m.uid === uidSaya;
+    div.className = 'msg ' + (milikSaya ? 'me' : 'other');
+    const waktu = (m.waktu && m.waktu.toDate) ? formatJam(m.waktu.toDate()) : '--:--';
+
+    let isi = '';
+    if (m.dihapus) {
+      isi += '<div class="teks-dihapus">pesan dihapus</div>';
+    } else {
+      if (m.dibalas) {
+        isi += '<div class="balasan-preview">↩ ' + escapeHtml(m.dibalas.nama) + ': ' + escapeHtml(potong(m.dibalas.teks || '', 60)) + '</div>';
+      }
+      if (m.gambar) {
+        isi += '<img class="pesan-gambar" src="' + m.gambar + '">';
+      }
+      if (m.teks) {
+        isi += '<span class="teks">' + escapeHtml(m.teks) + '</span>';
+      }
+      if (m.diedit) {
+        isi += ' <span class="tag-diedit">(diedit)</span>';
+      }
+    }
+
+    isi += renderReaksi(m.reaksi);
+
+    let aksi = '';
+    if (!m.dihapus) {
+      aksi = '<div class="aksi-row hidden">' +
+        '<button data-aksi="balas">↩ balas</button>' +
+        '<button data-aksi="react">😀 react</button>' +
+        (milikSaya ? '<button data-aksi="edit">✎ edit</button><button data-aksi="hapus">🗑 hapus</button>' : '') +
+        '</div>';
+    }
+
+    div.innerHTML =
+      renderAvatar(m.uid, m.nama) +
+      '<span class="msg-text">' +
+      '<span class="meta">[' + waktu + ']</span>' +
+      '<span class="nama">' + escapeHtml(m.nama) + '&gt;</span> ' +
+      isi + aksi +
+      '</span>';
+    return div;
+  }
+
+  function potong(str, n) {
+    return str.length > n ? str.slice(0, n) + '…' : str;
+  }
+
+  function renderReaksi(reaksi) {
+    if (!reaksi) return '';
+    const entries = Object.keys(reaksi).filter((e) => reaksi[e] && reaksi[e].length > 0);
+    if (!entries.length) return '';
+    let html = '<div class="reaksi-row">';
+    entries.forEach((emoji) => {
+      const punyaSaya = reaksi[emoji].includes(uidSaya);
+      html += '<span class="reaksi-pill' + (punyaSaya ? ' aktif' : '') + '" data-reaksi-emoji="' + emoji + '">' + emoji + ' ' + reaksi[emoji].length + '</span>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // --- Delegasi klik untuk semua interaksi di dalam #messages ---
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const imgEl = e.target.closest('.pesan-gambar');
+    if (imgEl) { tampilkanLightbox(imgEl.getAttribute('src')); return; }
+
+    const reaksiPill = e.target.closest('[data-reaksi-emoji]');
+    if (reaksiPill) {
+      const msgDivR = reaksiPill.closest('[data-id]');
+      toggleReaksi(msgDivR.getAttribute('data-id'), reaksiPill.getAttribute('data-reaksi-emoji'));
+      return;
+    }
+
+    const aksiBtn = e.target.closest('[data-aksi]');
+    if (aksiBtn) {
+      const msgDivA = aksiBtn.closest('[data-id]');
+      const id = msgDivA.getAttribute('data-id');
+      const aksi = aksiBtn.getAttribute('data-aksi');
+      if (aksi === 'balas') mulaiBalas(id);
+      else if (aksi === 'edit') mulaiEdit(id);
+      else if (aksi === 'hapus') hapusPesan(id);
+      else if (aksi === 'react') tampilkanPemilihReaksi(id, aksiBtn);
+      return;
+    }
+
+    const msgDiv = e.target.closest('.msg[data-id]');
+    if (msgDiv) toggleAksiRow(msgDiv);
+  });
+
+  function toggleAksiRow(msgDiv) {
+    const row = msgDiv.querySelector('.aksi-row');
+    if (!row) return;
+    const sedangTerbuka = !row.classList.contains('hidden');
+    document.querySelectorAll('.aksi-row').forEach((el) => el.classList.add('hidden'));
+    if (!sedangTerbuka) row.classList.remove('hidden');
+  }
+
+  function tampilkanLightbox(src) {
+    const overlay = document.createElement('div');
+    overlay.className = 'lightbox-overlay';
+    overlay.innerHTML = '<img src="' + src + '">';
+    overlay.addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
+  }
+
+  function toggleReaksi(id, emoji) {
+    const ref = db.collection('rooms').doc(roomAktif).collection('messages').doc(id);
+    const m = pesanCache[id];
+    const sudahAda = !!(m && m.reaksi && m.reaksi[emoji] && m.reaksi[emoji].includes(uidSaya));
+    const op = sudahAda ? firebase.firestore.FieldValue.arrayRemove(uidSaya) : firebase.firestore.FieldValue.arrayUnion(uidSaya);
+    ref.update({ ['reaksi.' + emoji]: op }).catch((err) => tampilkanErrorChat(err));
+  }
+
+  function tampilkanPemilihReaksi(id, tombolAsal) {
+    document.querySelectorAll('.reaksi-picker').forEach((el) => el.remove());
+    const picker = document.createElement('div');
+    picker.className = 'reaksi-picker';
+    EMOJI_REAKSI.forEach((e) => {
+      const span = document.createElement('span');
+      span.textContent = e;
+      span.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        toggleReaksi(id, e);
+        picker.remove();
+      });
+      picker.appendChild(span);
+    });
+    tombolAsal.closest('.aksi-row').appendChild(picker);
+  }
+
+  // --- Balas pesan ---
+  function mulaiBalas(id) {
+    const m = pesanCache[id];
+    if (!m) return;
+    balasKe = { nama: m.nama, teks: m.teks || (m.gambar ? '[gambar]' : '') };
+    document.getElementById('balasPreviewTeks').textContent = m.nama + ': ' + potong(balasKe.teks, 50);
+    document.getElementById('balasPreview').classList.remove('hidden');
+    document.getElementById('msgInput').focus();
+  }
+
+  document.getElementById('batalBalasBtn').addEventListener('click', () => {
+    balasKe = null;
+    document.getElementById('balasPreview').classList.add('hidden');
+  });
+
+  // --- Edit pesan ---
+  function mulaiEdit(id) {
+    const m = pesanCache[id];
+    if (!m || m.uid !== uidSaya) return;
+    sedangEdit = id;
+    document.getElementById('msgInput').value = m.teks || '';
+    document.getElementById('msgInput').focus();
+    document.getElementById('editPreview').classList.remove('hidden');
+    document.getElementById('sendBtn').textContent = 'simpan ↵';
+  }
+
+  document.getElementById('batalEditBtn').addEventListener('click', batalEdit);
+  function batalEdit() {
+    sedangEdit = null;
+    document.getElementById('msgInput').value = '';
+    document.getElementById('editPreview').classList.add('hidden');
+    document.getElementById('sendBtn').textContent = 'kirim ↵';
+  }
+
+  function hapusPesan(id) {
+    const m = pesanCache[id];
+    if (!m || m.uid !== uidSaya) return;
+    if (!confirm('Hapus pesan ini?')) return;
+    db.collection('rooms').doc(roomAktif).collection('messages').doc(id).update({
+      dihapus: true,
+      teks: '',
+      gambar: firebase.firestore.FieldValue.delete()
+    }).catch((err) => tampilkanErrorChat(err));
+  }
+
+  // --- Emoji buat mengetik pesan ---
+  const emojiPanelEl = document.getElementById('emojiPanel');
+  EMOJI_PILIHAN.forEach((e) => {
+    const span = document.createElement('span');
+    span.textContent = e;
+    span.addEventListener('click', () => {
+      document.getElementById('msgInput').value += e;
+      document.getElementById('msgInput').focus();
+      emojiPanelEl.classList.add('hidden');
+    });
+    emojiPanelEl.appendChild(span);
+  });
+  document.getElementById('emojiBtn').addEventListener('click', () => {
+    emojiPanelEl.classList.toggle('hidden');
+  });
+
+  // --- Kirim gambar ---
+  document.getElementById('gambarInput').addEventListener('change', (e) => {
+    prosesGambarKirim(e.target.files[0]);
+  });
+
+  function prosesGambarKirim(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        kompresGambar(img, 640, 0.7, (dataUrl) => {
+          gambarPending = dataUrl;
+          document.getElementById('gambarPreviewImg').src = dataUrl;
+          document.getElementById('gambarPreviewBar').classList.remove('hidden');
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function kompresGambar(img, maxSisi, kualitas, callback) {
+    let w = img.width, h = img.height;
+    if (w >= h && w > maxSisi) { h = Math.round(h * (maxSisi / w)); w = maxSisi; }
+    else if (h > maxSisi) { w = Math.round(w * (maxSisi / h)); h = maxSisi; }
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    const hasil = canvas.toDataURL('image/jpeg', kualitas);
+    if (hasil.length > 700000 && kualitas > 0.3) {
+      kompresGambar(img, maxSisi, kualitas - 0.2, callback);
+      return;
+    }
+    callback(hasil);
+  }
+
+  document.getElementById('batalGambarBtn').addEventListener('click', () => {
+    gambarPending = null;
+    document.getElementById('gambarPreviewBar').classList.add('hidden');
+    document.getElementById('gambarInput').value = '';
+  });
+
+  // --- Notifikasi ---
+  document.getElementById('notifBtn').addEventListener('click', () => {
+    if (typeof Notification === 'undefined') {
+      alert('Browser ini tidak mendukung notifikasi.');
+      return;
+    }
+    Notification.requestPermission().then((izin) => {
+      notifDiizinkan = izin === 'granted';
+      perbaruiTombolNotif();
+    });
+  });
+
+  function perbaruiTombolNotif() {
+    const btn = document.getElementById('notifBtn');
+    if (!btn) return;
+    btn.textContent = notifDiizinkan ? '🔔 notifikasi aktif' : '🔔 aktifkan notifikasi';
+  }
+  perbaruiTombolNotif();
+
+  function formatJam(d) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  document.getElementById('sendBtn').addEventListener('click', kirim);
+  document.getElementById('msgInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') kirim();
+  });
+
+  function kirim() {
+    const input = document.getElementById('msgInput');
+    const teks = input.value.trim();
+    if (!teks && !gambarPending) return;
+
+    clearTimeout(ketikTimer);
+    db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya).delete().catch(() => {});
+
+    if (sedangEdit) {
+      const idEdit = sedangEdit;
+      db.collection('rooms').doc(roomAktif).collection('messages').doc(idEdit).update({
+        teks: teks,
+        diedit: true
+      }).catch((err) => tampilkanErrorChat(err));
+      batalEdit();
+      return;
+    }
+
+    const data = {
+      nama: namaSaya,
+      teks: teks,
+      uid: uidSaya,
+      waktu: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (balasKe) data.dibalas = balasKe;
+    if (gambarPending) data.gambar = gambarPending;
+
+    input.value = '';
+    if (balasKe) {
+      balasKe = null;
+      document.getElementById('balasPreview').classList.add('hidden');
+    }
+    if (gambarPending) {
+      gambarPending = null;
+      document.getElementById('gambarPreviewBar').classList.add('hidden');
+      document.getElementById('gambarInput').value = '';
+    }
+
+    db.collection('rooms').doc(roomAktif).collection('messages').add(data)
+      .catch((err) => tampilkanErrorChat(err));
+  }
+
+  function kirimSistem(teks) {
+    db.collection('rooms').doc(roomAktif).collection('messages').add({
+      sistem: true,
+      teks: teks,
+      waktu: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
+  }
+
+  function tampilkanErrorChat(err) {
+    const wrap = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'msg system';
+    div.textContent = '⚠ ' + err.message;
+    wrap.appendChild(div);
+  }
+</script>
+</body>
+</html>
