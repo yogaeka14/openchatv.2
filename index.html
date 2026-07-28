@@ -383,6 +383,21 @@
     font-style: italic; margin: auto; padding: 30px 20px;
   }
 
+  .divider-tanggal {
+    text-align: center; color: var(--text-dim); font-size: 11px;
+    margin: 8px 0; letter-spacing: 0.5px; position: relative;
+  }
+  .divider-tanggal::before, .divider-tanggal::after {
+    content: ''; position: absolute; top: 50%; width: 28%; height: 1px; background: var(--border);
+  }
+  .divider-tanggal::before { left: 4px; }
+  .divider-tanggal::after { right: 4px; }
+
+  #indikatorKetik {
+    padding: 4px 14px; font-size: 12px; color: var(--text-dim); font-style: italic;
+    flex-shrink: 0; background: var(--panel-2);
+  }
+
   .room-meta { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
 
   @media (prefers-reduced-motion: reduce) {
@@ -467,6 +482,7 @@
       </div>
 
       <div class="emoji-panel hidden" id="emojiPanel"></div>
+      <div class="hidden" id="indikatorKetik"></div>
 
       <div class="input-row">
         <span class="prompt-symbol">&gt;</span>
@@ -540,6 +556,10 @@
   let notifDiizinkan = (typeof Notification !== 'undefined' && Notification.permission === 'granted');
   const EMOJI_PILIHAN = ['😀','😂','😍','👍','👎','❤️','🔥','🎉','😢','😮','🙏','😅','😎','🤔','👏','💯'];
   const EMOJI_REAKSI = ['😀','😂','❤️','👍','👎','😮','😢','🔥'];
+
+  let lepasListenerKetik = null;
+  let ketikTimer = null;
+  let terakhirTulisKetik = 0;
 
   const HTML_PERINGATAN_KONFIG =
     '<div><span class="tag-warn">[PERINGATAN]</span> firebaseConfig belum diisi.</div>' +
@@ -895,6 +915,7 @@
     document.getElementById('msgInput').focus();
 
     dengarkanPesan();
+    dengarkanKetik();
     kirimSistem(namaSaya + ' bergabung ke ruang obrol');
   }
 
@@ -902,6 +923,11 @@
 
   function gantiRuangan() {
     if (lepasListenerPesan) { lepasListenerPesan(); lepasListenerPesan = null; }
+    if (lepasListenerKetik) { lepasListenerKetik(); lepasListenerKetik = null; }
+    if (roomAktif && uidSaya) {
+      db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya).delete().catch(() => {});
+    }
+    clearTimeout(ketikTimer);
     roomAktif = null;
     chatScreen.classList.add('hidden');
     roomScreen.classList.remove('hidden');
@@ -909,9 +935,69 @@
     muatDaftarRoom();
   }
 
+  function dengarkanKetik() {
+    if (lepasListenerKetik) lepasListenerKetik();
+    lepasListenerKetik = db.collection('rooms').doc(roomAktif).collection('mengetik').onSnapshot((snapshot) => {
+      const namaOrang = [];
+      const sekarang = Date.now();
+      snapshot.forEach((doc) => {
+        if (doc.id === uidSaya) return;
+        const d = doc.data();
+        if (d.waktu && d.waktu.toMillis && (sekarang - d.waktu.toMillis()) < 5000) {
+          namaOrang.push(d.nama);
+        }
+      });
+      const indikator = document.getElementById('indikatorKetik');
+      if (namaOrang.length === 0) {
+        indikator.classList.add('hidden');
+      } else {
+        indikator.textContent = namaOrang.join(', ') + (namaOrang.length > 1 ? ' sedang mengetik...' : ' sedang mengetik...');
+        indikator.classList.remove('hidden');
+      }
+    });
+  }
+
+  document.getElementById('msgInput').addEventListener('input', () => {
+    if (!roomAktif) return;
+    const sekarang = Date.now();
+    if (sekarang - terakhirTulisKetik > 2500) {
+      terakhirTulisKetik = sekarang;
+      db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya)
+        .set({ nama: namaSaya, waktu: firebase.firestore.FieldValue.serverTimestamp() }).catch(() => {});
+    }
+    clearTimeout(ketikTimer);
+    ketikTimer = setTimeout(() => {
+      db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya).delete().catch(() => {});
+    }, 3000);
+  });
+
+  function teksTanggal(tgl) {
+    const skrg = new Date();
+    const a = new Date(skrg.getFullYear(), skrg.getMonth(), skrg.getDate());
+    const b = new Date(tgl.getFullYear(), tgl.getMonth(), tgl.getDate());
+    const bedaHari = Math.round((a - b) / 86400000);
+    if (bedaHari === 0) return 'hari ini';
+    if (bedaHari === 1) return 'kemarin';
+    return tgl.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  function cekTanggalPembatas(m, wrap) {
+    if (!m.waktu || !m.waktu.toDate) return;
+    const tgl = m.waktu.toDate();
+    const kunci = tgl.getFullYear() + '-' + tgl.getMonth() + '-' + tgl.getDate();
+    if (wrap.getAttribute('data-tanggal-terakhir') === kunci) return;
+    wrap.setAttribute('data-tanggal-terakhir', kunci);
+    const div = document.createElement('div');
+    div.className = 'divider-tanggal';
+    div.textContent = teksTanggal(tgl);
+    wrap.appendChild(div);
+  }
+
   function dengarkanPesan() {
     if (lepasListenerPesan) lepasListenerPesan();
-    document.getElementById('messages').innerHTML = '';
+    const wrapAwal = document.getElementById('messages');
+    wrapAwal.innerHTML = '';
+    wrapAwal.removeAttribute('data-tanggal-terakhir');
     let snapshotPertama = true;
     lepasListenerPesan = db.collection('rooms').doc(roomAktif).collection('messages')
       .orderBy('waktu', 'asc')
@@ -962,6 +1048,7 @@
       perbaruiPesanTunggal(id, m);
       return;
     }
+    cekTanggalPembatas(m, wrap);
     const el = buatElemenPesan(id, m);
     el.classList.add('msg-baru');
     wrap.appendChild(el);
@@ -1264,6 +1351,9 @@
     const input = document.getElementById('msgInput');
     const teks = input.value.trim();
     if (!teks && !gambarPending) return;
+
+    clearTimeout(ketikTimer);
+    db.collection('rooms').doc(roomAktif).collection('mengetik').doc(uidSaya).delete().catch(() => {});
 
     if (sedangEdit) {
       const idEdit = sedangEdit;
